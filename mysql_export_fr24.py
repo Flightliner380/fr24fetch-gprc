@@ -6,7 +6,6 @@ import duckdb
 import config
 from sqlalchemy import create_engine
 
-
 def mysql_export(frdbmysql: str = "k53371_fp.fr24", chunk_size: int = 7500) -> None:
 
     started_at = time.perf_counter()
