@@ -1,7 +1,7 @@
 import os
 import time
 from datetime import datetime
-
+import datetime as dt
 import duckdb
 import config
 from sqlalchemy import create_engine
@@ -22,7 +22,7 @@ def mysql_export(frdbmysql: str = "k53371_fp.fr24", chunk_size: int = 7500) -> N
         f"fr24_{ym}.duckdb",
     )
 
-    print(f"Date:{ymd} DuckDB: {db_name} Chunk size: {chunk_size} MySQL table: {frdbmysql}")
+    print(f"{dt.datetime.now(dt.timezone.utc).strftime('%Y-%m-%d %H:%M:%S UTC')} Date:{ymd} DuckDB: {db_name} Chunk size: {chunk_size} MySQL table: {frdbmysql}")
     
     if not os.path.exists(db_name):
         raise FileNotFoundError(db_name)
@@ -338,7 +338,7 @@ def mysql_export(frdbmysql: str = "k53371_fp.fr24", chunk_size: int = 7500) -> N
                 f"Processed: {total}"
             )
             print(
-                f"Elapsed export time: {time.perf_counter() - export_started_at:.2f}s"
+                f"{dt.datetime.now(dt.timezone.utc).strftime("%Y-%m-%d %H:%M:%S UTC")}  Elapsed export time: {time.perf_counter() - export_started_at:.2f}s"
             )
 
     finally:
