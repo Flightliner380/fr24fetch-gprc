@@ -8,6 +8,7 @@ import duckdb
 import os
 from datetime import datetime
 
+
 from pathlib import Path
 from sqlalchemy import create_engine, text
 from sqlalchemy.exc import SQLAlchemyError
@@ -264,7 +265,7 @@ def export_df_to_duckdb(
 
 
 async def fetch_grpc():
-    start_time = dt.datetime.now(dt.UTC).strftime("%Y-%m-%d %H:%M:%S UTC")
+    start_time = dt.datetime.now(dt.timezone.utc).strftime("%Y-%m-%d %H:%M:%S UTC")
     print(f"Start time: {start_time}")
     total_start = time.perf_counter()
 
@@ -299,12 +300,12 @@ async def fetch_grpc():
 
 
 async def main() -> None:
-     print(f"Starting FR24 gRPC fetch... UTC: {dt.datetime.now(dt.UTC).strftime('%Y-%m-%d %H:%M:%S UTC')}")
-     if dt.datetime.now(dt.UTC).minute % 2 == 0:
+     print(f"Starting FR24 gRPC fetch... UTC: {dt.datetime.now(dt.timezone.utc).strftime('%Y-%m-%d %H:%M:%S UTC')}")
+     if dt.datetime.now(dt.timezone.utc).minute % 2 == 0:
           fetch_task = asyncio.create_task(fetch_grpc())
           await fetch_task
 
-     if dt.datetime.now(dt.UTC).minute % 2 == 0:
+     if dt.datetime.now(dt.timezone.utc).minute % 2 == 0:
           await asyncio.to_thread(mysql_export)
 
 
