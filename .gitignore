@@ -1,0 +1,6 @@
+config.py
+venv/
+duckdb/
+fr24_parq/
+__pycache__/
+
