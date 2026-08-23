@@ -479,11 +479,13 @@ def run_mysql_export_every_5_minutes() -> bool:
 
 
 async def main() -> None:
-    fetch_task = asyncio.create_task(fetch_grpc())
-    await fetch_task
+     print(f"Starting FR24 gRPC fetch... UTC: {dt.datetime.now(dt.UTC).strftime('%Y-%m-%d %H:%M:%S UTC')}")
+     if dt.datetime.now(dt.UTC).minute % 2 == 0:
+          fetch_task = asyncio.create_task(fetch_grpc())
+          await fetch_task
 
-    if dt.datetime.now(dt.UTC).minute % 5 == 0:
-        await asyncio.to_thread(mysql_export())
+     if dt.datetime.now(dt.UTC).minute % 5 == 0:
+          await asyncio.to_thread(mysql_export)
 
 
 if __name__ == "__main__":
