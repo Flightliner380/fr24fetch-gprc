@@ -13,6 +13,10 @@ python3 -m venv "$VENV_DIR"
 
 "$VENV_DIR/bin/python" -m pip install --upgrade pip
 
+if [[ -d "../fr24gprc" ]]; then
+	"$VENV_DIR/bin/python" -m pip install ../fr24gprc/.
+fi
+
 if [[ -f "requirements.txt" ]]; then
 	"$VENV_DIR/bin/python" -m pip install -r requirements.txt
 	echo "Virtual environment created and requirements installed."
