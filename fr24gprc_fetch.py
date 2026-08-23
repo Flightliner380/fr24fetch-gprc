@@ -6,6 +6,7 @@ import re
 import flag
 import duckdb
 import os
+import random
 from datetime import datetime
 
 
@@ -306,6 +307,9 @@ async def main() -> None:
           await fetch_task
 
      if dt.datetime.now(dt.timezone.utc).minute % 2 == 0:
+          rnd=random.randint(10, 30)
+          print(f"Waiting for a random delay before next fetch... {rnd} seconds")
+          await asyncio.sleep(rnd)
           await asyncio.to_thread(mysql_export)
 
 
