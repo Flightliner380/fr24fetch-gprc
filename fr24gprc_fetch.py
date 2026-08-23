@@ -30,7 +30,7 @@ def int2frid(int):
      return hex(int).replace('0x','')
 
 def ymd(ts): 
-     return dt.datetime.fromtimestamp(ts, dt.UTC).strftime('%Y-%m-%d')
+     return dt.datetime.fromtimestamp(ts, dt.timezone.utc).strftime('%Y-%m-%d')
 
 def al(cs):
      x=re.findall("^((RA|UK)[0-9]{5}|V8001|T7[0-9]|B[0-9]{4,5}|^N([0-9]{1,5})([A-Z]{0,2})?)",cs)
