@@ -13,6 +13,7 @@ from sqlalchemy import create_engine, text
 from sqlalchemy.exc import SQLAlchemyError
 import config
 from fr24.core import FR24
+from rt.mysql_export_fr24 import mysql_export
 
 def int2hexcode(int): 
      if int == 0:
@@ -452,9 +453,38 @@ async def fetch_grpc():
     print(f"Total fetch_grpc time: {total_elapsed:.2f}s")
 
 
+def run_mysql_export_every_5_minutes() -> bool:
+     now = dt.datetime.now(dt.UTC)
+     if now.minute % 5 != 0:
+          print("mysql_export skipped (not 5-minute mark)")
+          return False
+
+     print("Running mysql_export (5-minute mark)")
+     try:
+          if hasattr(mysql_export_fr24, "main") and callable(mysql_export_fr24.main):
+               mysql_export_fr24.main()
+          elif hasattr(mysql_export_fr24, "run") and callable(mysql_export_fr24.run):
+               mysql_export_fr24.run()
+          elif hasattr(mysql_export_fr24, "export") and callable(mysql_export_fr24.export):
+               mysql_export_fr24.export()
+          else:
+               print("mysql_export_fr24 has no callable entrypoint")
+               return False
+          return True
+     except Exception as e:
+          print(f"mysql_export failed: {e}")
+          return False
+
+
+
+
+async def main() -> None:
+    fetch_task = asyncio.create_task(fetch_grpc())
+    await fetch_task
+
+    if dt.datetime.now(dt.UTC).minute % 5 == 0:
+        await asyncio.to_thread(mysql_export())
 
 
 if __name__ == "__main__":
-    asyncio.run(fetch_grpc())
-
-     
+    asyncio.run(main())

@@ -7,27 +7,24 @@ import config
 from sqlalchemy import create_engine
 
 
-def mysql_export():
+def mysql_export(frdbmysql: str = "k53371_fp.fr24", chunk_size: int = 7500) -> None:
 
     started_at = time.perf_counter()
 
     ym = datetime.now().strftime("%Y-%m")
     ymd = datetime.now().strftime("%Y-%m-%d")
 
-    frdbmysql = "k53371_fp.fr24_t1"
+    # frdbmysql = "k53371_fp.fr24_t1"
 
-    chunk_size = 15000
+    # chunk_size = 15000
 
     db_name = os.path.join(
         "duckdb",
         f"fr24_{ym}.duckdb",
     )
 
-    print(f"DuckDB: {db_name}")
-    print(f"MySQL table: {frdbmysql}")
-    print(f"Date: {ymd}")
-    print(f"Chunk size: {chunk_size}")
-
+    print(f"Date:{ymd} DuckDB: {db_name} Chunk size: {chunk_size} MySQL table: {frdbmysql}")
+    
     if not os.path.exists(db_name):
         raise FileNotFoundError(db_name)
 
