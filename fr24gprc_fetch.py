@@ -397,7 +397,7 @@ def export_df_to_duckdb(
           f"SELECT {insert_columns} FROM batch_df "
           f"ON CONFLICT (ymd,frid, hex,cs, gnd) DO UPDATE SET {update_l_columns_sql}"
      )
-     print(f"Insert SQL: {insert_sql}")
+     # print(f"Insert SQL: {insert_sql}")
      for month_period, month_df in prepared.groupby(prepared["ymd"].dt.to_period("M")):
           db_path = out_dir / f"fr24_{month_period.year}-{month_period.month:02d}.duckdb"
           conn = duckdb.connect(str(db_path))
@@ -484,7 +484,7 @@ async def main() -> None:
           fetch_task = asyncio.create_task(fetch_grpc())
           await fetch_task
 
-     if dt.datetime.now(dt.UTC).minute % 5 == 0:
+     if dt.datetime.now(dt.UTC).minute % 2 == 0:
           await asyncio.to_thread(mysql_export)
 
 
