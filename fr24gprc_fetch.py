@@ -13,7 +13,7 @@ from sqlalchemy import create_engine, text
 from sqlalchemy.exc import SQLAlchemyError
 import config
 from fr24.core import FR24
-from rt.mysql_export_fr24 import mysql_export
+from mysql_export_fr24 import mysql_export
 
 def int2hexcode(int): 
      if int == 0:
