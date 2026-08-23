@@ -110,6 +110,7 @@ def fr24convert(df) -> pd.DataFrame:
      else:
           df['cs'] = '------'
      df['al'] = al_series(df['cs'])
+     df['lcontact'] = df['fcontact']
      hex_to_iso = {hx: flag.find_icao_range(hx) for hx in df['hex'].dropna().unique()}
      df['iso'] = df['hex'].map(hex_to_iso)
      if 'fcontact' in df.columns:
@@ -124,8 +125,9 @@ def fr24convert(df) -> pd.DataFrame:
 
      if 'flight' in df.columns and 'flt' not in df.columns:
           df['flt'] = df['flight'].apply(split_flt)
+     #     'addr', 'lcontact', 'llat', 'llon', 'lalt', 'lhdg', 'lspeed', 'lvert', 'lsq', 'lrdr', 'lnear','fnear'
      missing_last_contact_cols = [
-          'addr', 'lcontact', 'llat', 'llon', 'lalt', 'lhdg', 'lspeed', 'lvert', 'lsq', 'lrdr', 'lnear','fnear'
+          'addr', 'llat', 'llon', 'lalt', 'lhdg', 'lspeed', 'lvert', 'lsq', 'lrdr', 'lnear','fnear'
      ]
 
      for col in missing_last_contact_cols:
@@ -144,164 +146,6 @@ def fr24convert(df) -> pd.DataFrame:
     #  print(df.columns)
      
      return df
-
-def export_df_to_mysql(
-    df: pd.DataFrame,
-    table_name: str = "k53371_fp.fr24_t",
-    batch_size: int = 10000,
-) -> int:
-
-    if df is None or df.empty:
-        return 0
-
-    mysql_conf = config.MYSQL_CONFIG
-
-    columns = [
-        "frid",
-        "ymd",
-        "addr",
-        "fcontact",
-        "lcontact",
-        "hex",
-        "reg",
-        "ac",
-        "cs",
-        "iso",
-        "flon",
-        "flat",
-        "llon",
-        "llat",
-        "falt",
-        "lalt",
-        "fhdg",
-        "lhdg",
-        "fspeed",
-        "lspeed",
-        "fvert",
-        "lvert",
-        "fsq",
-        "lsq",
-        "gnd",
-        "flt",
-        "al",
-        "dep",
-        "arr",
-        "frdr",
-        "lrdr",
-        "fnear",
-        "lnear",
-    ]
-
-    # Only use required columns
-    prepared = df[columns].copy()
-
-    # Convert NaN / NaT to None
-    prepared = prepared.where(pd.notna(prepared), None)
-
-    # MySQL connection
-    driver = mysql_conf.get("driver", "pymysql")
-    port = mysql_conf.get("port", 3306)
-
-    mysql_url = (
-        f"mysql+{driver}://"
-        f"{mysql_conf['user']}:{mysql_conf['password']}"
-        f"@{mysql_conf['host']}:{port}/"
-        f"{mysql_conf['database']}"
-        "?charset=utf8mb4"
-    )
-
-    engine = create_engine(
-        mysql_url,
-        pool_pre_ping=True,
-    )
-
-    columns_sql = ", ".join(columns)
-    inserted = 0
-
-    try:
-          with engine.connect() as conn:
-               total = len(prepared)
-
-               for batch_start in range(0, total, batch_size):
-                    batch = prepared.iloc[
-                         batch_start:batch_start + batch_size
-                    ]
-
-                    print(
-                         f"Inserting {batch_start + 1}-"
-                         f"{min(batch_start + len(batch), total)} "
-                         f"of {total}"
-                    )
-
-                    params = {}
-                    value_rows = []
-
-                    # Build one VALUES (...) per dataframe row
-                    for row_number, row in enumerate(
-                         batch.itertuples(index=False, name=None)
-                    ):
-                         values = []
-
-                         for col_number, col in enumerate(columns):
-                              parameter = f"{col}_{row_number}"
-
-                              # fnear is calculated by MySQL
-                              if col == "fnear":
-                                   values.append(
-                                        f"k53371_fp.nb("
-                                        f":flat_{row_number}, "
-                                        f":flon_{row_number})"
-                                   )
-                              else:
-                                   values.append(f":{parameter}")
-                                   params[parameter] = row[col_number]
-
-                         value_rows.append(
-                              "(" + ", ".join(values) + ")"
-                         )
-
-                    sql = f"""
-                         INSERT INTO {table_name}
-                         ({columns_sql})
-                         VALUES
-                         {", ".join(value_rows)}
-                         AS nv
-                         ON DUPLICATE KEY UPDATE
-                              lcontact = nv.fcontact,
-                              llon     = nv.flon,
-                              llat     = nv.flat,
-                              lalt     = nv.falt,
-                              lhdg     = nv.fhdg,
-                              lspeed   = nv.lspeed,
-                              lvert    = nv.lvert,
-                              lsq      = nv.lsq,
-                              lrdr     = nv.lrdr,
-                              lnear    = k53371_fp.nb(
-                                   nv.flat,
-                                   nv.flon
-                              )
-                    """
-
-                    trans = conn.begin()
-                    try:
-                         conn.execute(
-                              text(sql),
-                              params
-                         )
-                         trans.commit()
-                    except Exception:
-                         trans.rollback()
-                         raise
-
-                    inserted += len(batch)
-
-    except SQLAlchemyError:
-        raise
-
-    finally:
-        engine.dispose()
-
-    return inserted
 
 
 def export_df_to_duckdb(
@@ -434,13 +278,13 @@ async def fetch_grpc():
 
         convert_start = time.perf_counter()
         df=fr24convert(dfm)
-        if 'gnd' in df.columns:
-            df_filtered = df[df['gnd'] == 0].copy()
-        else:
-            df_filtered = df.copy()
+     #    if 'gnd' in df.columns:
+     #        df_filtered = df[df['gnd'] == 0].copy()
+     #    else:
+     #        df_filtered = df.copy()
 
         print(f"All flights: {len(df)}")
-        print(f"df_filtered: {len(df_filtered)}")
+     #     print(f"df_filtered: {len(df_filtered)}")
         
         # export_df_to_mysql(df_filtered, table_name='k53371_fp.fr24_t1', batch_size=6000)
 
@@ -448,32 +292,8 @@ async def fetch_grpc():
         convert_elapsed = time.perf_counter() - convert_start
 
     total_elapsed = time.perf_counter() - total_start
-    print(f"FR24 fetch time: {fetch_elapsed:.2f}s")
-    print(f"fr24convert time: {convert_elapsed:.2f}s")
-    print(f"Total fetch_grpc time: {total_elapsed:.2f}s")
+    print(f"FR24 fetch time: {fetch_elapsed:.2f}s , fr24convert time: {convert_elapsed:.2f}s , Total fetch_grpc time: {total_elapsed:.2f}s")
 
-
-def run_mysql_export_every_5_minutes() -> bool:
-     now = dt.datetime.now(dt.UTC)
-     if now.minute % 5 != 0:
-          print("mysql_export skipped (not 5-minute mark)")
-          return False
-
-     print("Running mysql_export (5-minute mark)")
-     try:
-          if hasattr(mysql_export_fr24, "main") and callable(mysql_export_fr24.main):
-               mysql_export_fr24.main()
-          elif hasattr(mysql_export_fr24, "run") and callable(mysql_export_fr24.run):
-               mysql_export_fr24.run()
-          elif hasattr(mysql_export_fr24, "export") and callable(mysql_export_fr24.export):
-               mysql_export_fr24.export()
-          else:
-               print("mysql_export_fr24 has no callable entrypoint")
-               return False
-          return True
-     except Exception as e:
-          print(f"mysql_export failed: {e}")
-          return False
 
 
 
