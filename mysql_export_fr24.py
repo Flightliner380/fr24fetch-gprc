@@ -294,7 +294,10 @@ def mysql_export(frdbmysql: str = "k53371_fp.fr24", chunk_size: int = 7500) -> N
                     lvert = nv.lvert,
                     lsq = nv.lsq,
                     lrdr = nv.lrdr,
-
+                    lnear = k53371_fp.nbp(
+#                        nv.llat,
+#                        nv.llon
+#                    ),
                     dep = nv.dep,
                     arr = nv.arr
             """
