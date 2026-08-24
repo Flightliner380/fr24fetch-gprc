@@ -121,7 +121,9 @@ def mysql_export(frdbmysql: str = "k53371_fp.fr24", chunk_size: int = 7500) -> N
                 dep,
                 arr,
                 frdr,
-                lrdr
+                lrdr,
+                fnear,
+                lnear
             FROM fr24
             WHERE ymd = ?
               AND lcontact > ? AND gnd = 0
@@ -192,15 +194,18 @@ def mysql_export(frdbmysql: str = "k53371_fp.fr24", chunk_size: int = 7500) -> N
             "%s,%s,%s,%s,%s,%s,%s,"
 
             # fnear
-            "k53371_fp.nb(%s,%s),"
+            #"k53371_fp.nb(%s,%s),"
+            "%s,"
 
             # lnear
-            "k53371_fp.nb(%s,%s)"
+            #"k53371_fp.nb(%s,%s)"
+            "%s"
             ")"
         )
 
         # Verify template
-        assert value_template.count("%s") == 35
+        print(value_template.count("%s"))
+        assert value_template.count("%s") == 33
 
         total = 0
 
@@ -248,18 +253,18 @@ def mysql_export(frdbmysql: str = "k53371_fp.fr24", chunk_size: int = 7500) -> N
                 params.extend(row)
 
                 # fnear
-                params.append(flat)
-                params.append(flon)
+                # params.append(flat)
+                # params.append(flon)
 
                 # lnear
-                params.append(llat)
-                params.append(llon)
+                # params.append(llat)
+                # params.append(llon)
 
             # -----------------------------------------------------
             # Sanity check
             # -----------------------------------------------------
 
-            expected = len(rows) * 35
+            expected = len(rows) * 33
 
             if len(params) != expected:
                 raise RuntimeError(
@@ -290,14 +295,14 @@ def mysql_export(frdbmysql: str = "k53371_fp.fr24", chunk_size: int = 7500) -> N
                     lsq = nv.lsq,
                     lrdr = nv.lrdr,
 
-                    lnear = k53371_fp.nb(
-                        nv.llat,
-                        nv.llon
-                    ),
-
                     dep = nv.dep,
                     arr = nv.arr
             """
+#                    lnear = k53371_fp.nb(
+#                        nv.llat,
+#                        nv.llon
+#                    ),
+
 
             print(
                 f"Bulk INSERT: {len(rows)} rows"
