@@ -13,6 +13,16 @@ import pandas as pd
 from fr24.core import FR24
 
 _CONFIG_PATH = Path(__file__).with_name("config.toml")
+APP_VERSION = "1.0.0"
+
+
+def _client_user_agent() -> str:
+    try:
+        config_data = _load_client_config()
+    except (FileNotFoundError, tomllib.TOMLDecodeError):
+        return f"fr24gprc/{APP_VERSION}"
+    user_agent = str(config_data.get("user_agent", "")).strip()
+    return user_agent or f"fr24gprc/{APP_VERSION}"
 
 
 def _utc_timestamp() -> str:
@@ -32,8 +42,9 @@ def _load_client_config() -> dict:
 def build_payload(df: pd.DataFrame, client_hostname: str, force_mysql_export: bool = False) -> dict:
     payload_df = df.where(pd.notna(df), None)
     payload_timestamp = dt.datetime.now(dt.timezone.utc).isoformat()
+    user_agent = _client_user_agent()
     return {
-        "s": "FR24 gRPC fetch",
+        "s": _client_user_agent(),
         "t": payload_timestamp,
         "n": int(len(payload_df)),
         "client_hostname": client_hostname,
@@ -49,7 +60,7 @@ def send_to_server(url: str, payload: dict, timeout: int = 30, force_mysql_expor
     compressed_body = gzip.compress(body, compresslevel=9)
     _log(
         "INFO",
-        f"POST {url} rows_total={len(payload.get('rows', []))} compressed_size={len(compressed_body)} bytes",
+        f"client_version={APP_VERSION} POST {url} rows_total={len(payload.get('rows', []))} compressed_size={len(compressed_body)} bytes",
     )
 
     req = request.Request(
@@ -59,8 +70,7 @@ def send_to_server(url: str, payload: dict, timeout: int = 30, force_mysql_expor
             "Content-Type": "application/json",
             "Content-Encoding": "gzip",
             "Content-Length": str(len(compressed_body)),
-            "User-Agent": "fxxr24gprc/1.0",
-            "fr24upload": "true",
+            "User-Agent": _client_user_agent(),
             "X-Force-MySQL-Export": "true" if force_mysql_export else "false",
         },
         method="POST",
@@ -115,7 +125,7 @@ async def fetch_and_send(server_url: str, timeout: int, client_hostname: str, fo
 
     _log(
         "INFO",
-        f"fetch_rows={len(df)} fetch_time={fetch_elapsed:.2f}s client_name={client_hostname} force_export={force_mysql_export}",
+        f"client_version={APP_VERSION} fetch_rows={len(df)} fetch_time={fetch_elapsed:.2f}s client_name={client_hostname} force_export={force_mysql_export}",
     )
     sent_ok = send_to_server(server_url, payload, timeout=timeout, force_mysql_export=force_mysql_export)
     total_elapsed = time.perf_counter() - started

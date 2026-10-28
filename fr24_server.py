@@ -27,6 +27,7 @@ from fr24_processing import export_df_to_duckdb, fr24convert
 from mysql_export_fr24 import mysql_export
 
 LOGGER = logging.getLogger("fr24_server")
+APP_VERSION = "1.0.0"
 _PROJECT_ROOT = Path(__file__).resolve().parent
 _CONFIG_PATH = _PROJECT_ROOT / "config.toml"
 DUCKDB_ACCESS_LOCK = threading.RLock()
@@ -482,11 +483,12 @@ async def ingest_handler(
     client_hostname = str(payload.get("client_hostname", "")).strip() or "unknown"
     payload_timestamp = str(payload.get("t", "")).strip() or dt.datetime.now(dt.timezone.utc).isoformat()
     rows_received = len(rows)
-    server_hostname = socket.gethostname()
+    server_hostname = (os.environ.get("SERVER_HOSTNAME") or socket.gethostname() or "unknown").strip() or "unknown"
     force_requested = bool(force_mysql_export or _force_mysql_export_requested(request, payload))
 
     LOGGER.info(
-        "Ingest request client_hostname=%s payload_timestamp=%s rows=%d server_hostname=%s force_mysql_export=%s",
+        "server_version=%s Ingest request client_hostname=%s payload_timestamp=%s rows=%d server_hostname=%s force_mysql_export=%s",
+        APP_VERSION,
         client_hostname,
         payload_timestamp,
         rows_received,
@@ -585,7 +587,8 @@ def main() -> None:
     DUCKDB_DIR = args.duckdb_dir
 
     LOGGER.info(
-        "FR24 server listening on http://%s:%s/ingest (mysql_export=%s)",
+        "FR24 server version=%s listening on http://%s:%s/ingest (mysql_export=%s)",
+        APP_VERSION,
         args.host,
         args.port,
         "on" if MYSQL_EXPORT_ENABLED else "off",
