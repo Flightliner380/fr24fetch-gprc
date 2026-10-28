@@ -17,7 +17,7 @@ import flag
 from mysql_export_fr24 import mysql_export
 
 _CONFIG_PATH = Path(__file__).with_name("config.toml")
-APP_VERSION = "0.4.0"
+APP_VERSION = "0.4.1"
 
 
 def _load_client_config() -> dict:
@@ -355,7 +355,7 @@ def export_df_to_duckdb(
      return total_written
 
 
-async def fetch_grpc(server_url: str, timeout: int, client_hostname: str):
+async def fetch_grpc() -> pd.DataFrame:
     start_time = dt.datetime.now(dt.timezone.utc).strftime("%Y-%m-%d %H:%M:%S UTC")
     print(f"Start time: {start_time}")
     total_start = time.perf_counter()
@@ -366,10 +366,10 @@ async def fetch_grpc(server_url: str, timeout: int, client_hostname: str):
         fetch_elapsed = time.perf_counter() - fetch_start
 
         datac = response.to_arrow()
-        dfm = datac.df
+        df_raw = datac.df.copy()
 
         convert_start = time.perf_counter()
-        df=fr24convert(dfm)
+        df = fr24convert(df_raw.copy())
      #    if 'gnd' in df.columns:
      #        df_filtered = df[df['gnd'] == 0].copy()
      #    else:
@@ -380,15 +380,12 @@ async def fetch_grpc(server_url: str, timeout: int, client_hostname: str):
         
         # export_df_to_mysql(df_filtered, table_name='k53371_fp.fr24_t1', batch_size=6000)
 
-        payload = build_payload(df, client_hostname=client_hostname)
-        upload_ok = send_to_server(server_url, payload, timeout=timeout)
-        print(f"Server upload ok: {upload_ok}")
-
         export_df_to_duckdb(df, table_name='fr24', base_dir='./duckdb')
         convert_elapsed = time.perf_counter() - convert_start
 
     total_elapsed = time.perf_counter() - total_start
     print(f"FR24 fetch time: {fetch_elapsed:.2f}s , fr24convert time: {convert_elapsed:.2f}s , Total fetch_grpc time: {total_elapsed:.2f}s")
+    return df_raw
 
 
 
@@ -402,14 +399,19 @@ async def main() -> None:
      client_hostname = str(client_cfg.get("hostname", "")).strip() or socket.gethostname()
 
      if dt.datetime.now(dt.timezone.utc).minute % 2 == 0:
-          fetch_task = asyncio.create_task(fetch_grpc(server_url, timeout, client_hostname))
-          await fetch_task
-
-     if dt.datetime.now(dt.timezone.utc).minute % 2 == 0:
           rnd=random.randint(10, 30)
-          print(f"Waiting for a random delay before next fetch... {rnd} seconds")
+          print(f"Waiting before fetch... {rnd} seconds")
           await asyncio.sleep(rnd)
+
+          df_raw = await fetch_grpc()
+
+          print("Starting MySQL export...")
           await asyncio.to_thread(mysql_export)
+          print("MySQL export done.")
+
+          payload = build_payload(df_raw, client_hostname=client_hostname)
+          upload_ok = send_to_server(server_url, payload, timeout=timeout)
+          print(f"Server upload ok: {upload_ok}")
 
 
 if __name__ == "__main__":
