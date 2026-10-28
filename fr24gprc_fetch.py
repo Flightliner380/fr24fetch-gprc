@@ -1,23 +1,113 @@
 import asyncio
-import time
-import pandas as pd
 import datetime as dt
-import re
-import flag
 import duckdb
-import os
+import gzip
+import json
+import pandas as pd
 import random
-from datetime import datetime
-
+import re
+import socket
+import time
+import tomllib
+from urllib import error, request
 
 from pathlib import Path
-from sqlalchemy import create_engine, text
-from sqlalchemy.exc import SQLAlchemyError
-import config
 from fr24.core import FR24
+import flag
 from mysql_export_fr24 import mysql_export
 
-def int2hexcode(int): 
+_CONFIG_PATH = Path(__file__).with_name("config.toml")
+APP_VERSION = "1.0.0"
+
+
+def _load_client_config() -> dict:
+     with _CONFIG_PATH.open("rb") as file_obj:
+          config_data = tomllib.load(file_obj)
+     return config_data.get("client", {})
+
+
+def _client_user_agent() -> str:
+     try:
+          config_data = _load_client_config()
+     except (FileNotFoundError, tomllib.TOMLDecodeError):
+          return f"fr24gprc/{APP_VERSION}"
+     user_agent = str(config_data.get("user_agent", "")).strip()
+     return user_agent or f"fr24gprc/{APP_VERSION}"
+
+
+def build_payload(df: pd.DataFrame, client_hostname: str) -> dict:
+     payload_df = df.where(pd.notna(df), None)
+     return {
+          "s": _client_user_agent(),
+          "t": dt.datetime.now(dt.timezone.utc).isoformat(),
+          "n": int(len(payload_df)),
+          "client_hostname": client_hostname,
+          "fmt": "cols_rows",
+          "cols": list(payload_df.columns),
+          "rows": payload_df.values.tolist(),
+     }
+
+
+def send_to_server(url: str, payload: dict, timeout: int = 30) -> bool:
+     if not url:
+          print("Server URL is empty; skipping upload.")
+          return False
+
+     body = json.dumps(payload, default=str, separators=(",", ":"), ensure_ascii=False).encode("utf-8")
+     compressed_body = gzip.compress(body, compresslevel=9)
+     print(f"POST {url} rows_total={len(payload.get('rows', []))} compressed_size={len(compressed_body)} bytes")
+
+     req = request.Request(
+          url,
+          data=compressed_body,
+          headers={
+               "Content-Type": "application/json",
+               "Content-Encoding": "gzip",
+               "Content-Length": str(len(compressed_body)),
+               "User-Agent": _client_user_agent(),
+          },
+          method="POST",
+     )
+
+     try:
+          with request.urlopen(req, timeout=timeout) as resp:
+               response_bytes = resp.read()
+               if resp.headers.get("Content-Encoding", "").lower() == "gzip":
+                    response_bytes = gzip.decompress(response_bytes)
+
+               response_text = response_bytes.decode("utf-8", errors="replace")
+               status_code = getattr(resp, "status", resp.getcode())
+               if status_code != 200:
+                    print(f"Server returned non-200 status={status_code} response={response_text[:500]}")
+                    return False
+
+               try:
+                    response_json = json.loads(response_text)
+               except (TypeError, ValueError):
+                    print(f"Server response payload: {response_text}")
+                    return True
+
+               print(f"Server response payload: {response_json}")
+               if isinstance(response_json, dict):
+                    return bool(response_json.get("ok", True))
+               return True
+     except error.HTTPError as exc:
+          body_text = exc.read().decode("utf-8", errors="replace")
+          print(f"Server HTTP error status={exc.code} reason={exc.reason} body={body_text[:500]}")
+          return False
+     except error.URLError as exc:
+          reason = getattr(exc, "reason", exc)
+          if isinstance(reason, OSError):
+               print(f"Server offline or unreachable: {reason}")
+          else:
+               print(f"Server connection error: {reason}")
+          return False
+     except OSError as exc:
+          print(f"Server communication failed: {exc}")
+          return False
+
+
+def int2hexcode(int):
      if int == 0:
           return '------'
      else:
@@ -265,7 +355,7 @@ def export_df_to_duckdb(
      return total_written
 
 
-async def fetch_grpc():
+async def fetch_grpc(server_url: str, timeout: int, client_hostname: str):
     start_time = dt.datetime.now(dt.timezone.utc).strftime("%Y-%m-%d %H:%M:%S UTC")
     print(f"Start time: {start_time}")
     total_start = time.perf_counter()
@@ -290,6 +380,10 @@ async def fetch_grpc():
         
         # export_df_to_mysql(df_filtered, table_name='k53371_fp.fr24_t1', batch_size=6000)
 
+        payload = build_payload(df, client_hostname=client_hostname)
+        upload_ok = send_to_server(server_url, payload, timeout=timeout)
+        print(f"Server upload ok: {upload_ok}")
+
         export_df_to_duckdb(df, table_name='fr24', base_dir='./duckdb')
         convert_elapsed = time.perf_counter() - convert_start
 
@@ -302,8 +396,13 @@ async def fetch_grpc():
 
 async def main() -> None:
      print(f"Starting FR24 gRPC fetch... UTC: {dt.datetime.now(dt.timezone.utc).strftime('%Y-%m-%d %H:%M:%S UTC')}")
+     client_cfg = _load_client_config()
+     server_url = str(client_cfg.get("server_url", "http://127.0.0.1:8080/ingest")).strip()
+     timeout = int(client_cfg.get("timeout", 30))
+     client_hostname = str(client_cfg.get("hostname", "")).strip() or socket.gethostname()
+
      if dt.datetime.now(dt.timezone.utc).minute % 2 == 0:
-          fetch_task = asyncio.create_task(fetch_grpc())
+          fetch_task = asyncio.create_task(fetch_grpc(server_url, timeout, client_hostname))
           await fetch_task
 
      if dt.datetime.now(dt.timezone.utc).minute % 2 == 0:
