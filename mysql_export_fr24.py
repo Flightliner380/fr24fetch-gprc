@@ -10,12 +10,24 @@ from sqlalchemy import create_engine
 
 LOGGER = logging.getLogger("fr24_mysql_export")
 
-_CONFIG_PATH = Path(__file__).with_name("config.toml")
+_PROJECT_ROOT = Path(__file__).resolve().parent
+_CONFIG_PATH = _PROJECT_ROOT / "config.toml"
 
 
 def _load_config() -> dict:
     with _CONFIG_PATH.open("rb") as file_obj:
         return tomllib.load(file_obj)
+
+
+def _resolve_duckdb_dir(duckdb_dir: str | None = None) -> Path:
+    config_data = _load_config()
+    export_cfg = config_data.get("export", {})
+    server_cfg = config_data.get("server", {})
+    configured_dir = duckdb_dir or export_cfg.get("duckdb_dir") or server_cfg.get("duckdb_dir") or "./duckdb"
+    resolved = Path(str(configured_dir)).expanduser()
+    if not resolved.is_absolute():
+        resolved = (_PROJECT_ROOT / resolved).resolve()
+    return resolved
 
 
 def _normalize_exclusion_values(raw_value) -> set[str]:
@@ -129,10 +141,8 @@ def mysql_export(
 
     # chunk_size = 15000
 
-    db_name = os.path.join(
-        "duckdb",
-        f"fr24_{ym}.duckdb",
-    )
+    db_dir = _resolve_duckdb_dir()
+    db_name = str(db_dir / f"fr24_{ym}.duckdb")
 
     LOGGER.info(
         "%s Date:%s DuckDB:%s Chunk size:%s MySQL table:%s",

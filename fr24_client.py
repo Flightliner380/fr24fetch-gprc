@@ -15,6 +15,14 @@ from fr24.core import FR24
 _CONFIG_PATH = Path(__file__).with_name("config.toml")
 
 
+def _utc_timestamp() -> str:
+    return dt.datetime.now(dt.timezone.utc).strftime("%Y-%m-%d %H:%M:%S UTC")
+
+
+def _log(level: str, message: str) -> None:
+    print(f"{_utc_timestamp()} [{level}] {message}", flush=True)
+
+
 def _load_client_config() -> dict:
     with _CONFIG_PATH.open("rb") as file_obj:
         config_data = tomllib.load(file_obj)
@@ -39,6 +47,10 @@ def build_payload(df: pd.DataFrame, client_hostname: str, force_mysql_export: bo
 def send_to_server(url: str, payload: dict, timeout: int = 30, force_mysql_export: bool = False) -> bool:
     body = json.dumps(payload, default=str, separators=(",", ":"), ensure_ascii=False).encode("utf-8")
     compressed_body = gzip.compress(body, compresslevel=9)
+    _log(
+        "INFO",
+        f"POST {url} rows_total={len(payload.get('rows', []))} compressed_size={len(compressed_body)} bytes",
+    )
 
     req = request.Request(
         url,
@@ -47,7 +59,7 @@ def send_to_server(url: str, payload: dict, timeout: int = 30, force_mysql_expor
             "Content-Type": "application/json",
             "Content-Encoding": "gzip",
             "Content-Length": str(len(compressed_body)),
-            "User-Agent": "fr24fetch-client/1.0",
+            "User-Agent": "fr24gprc/1.0",
             "fr24upload": "true",
             "X-Force-MySQL-Export": "true" if force_mysql_export else "false",
         },
@@ -61,8 +73,10 @@ def send_to_server(url: str, payload: dict, timeout: int = 30, force_mysql_expor
                 response_bytes = gzip.decompress(response_bytes)
 
             response_text = response_bytes.decode("utf-8", errors="replace")
-            print(f"Server status: {getattr(resp, 'status', resp.getcode())}")
-            print(f"Server response: {response_text}")
+            status_code = getattr(resp, "status", resp.getcode())
+            if status_code != 200:
+                _log("ERROR", f"Server returned non-200 status={status_code} response={response_text[:500]}")
+                return False
 
             response_json = json.loads(response_text)
             if isinstance(response_json, dict):
@@ -70,19 +84,23 @@ def send_to_server(url: str, payload: dict, timeout: int = 30, force_mysql_expor
             return False
     except error.HTTPError as exc:
         body_text = exc.read().decode("utf-8", errors="replace")
-        print(f"Server HTTP error: {exc.code} {exc.reason} body={body_text}")
+        _log("ERROR", f"Server HTTP error status={exc.code} reason={exc.reason} body={body_text[:500]}")
         return False
     except error.URLError as exc:
-        print(f"Server connection error: {exc.reason}")
+        reason = getattr(exc, "reason", exc)
+        if isinstance(reason, OSError):
+            _log("ERROR", f"Server offline or unreachable: {reason}")
+        else:
+            _log("ERROR", f"Server connection error: {reason}")
         return False
     except (TypeError, ValueError, OSError) as exc:
-        print(f"Server communication failed: {exc}")
+        _log("ERROR", f"Server communication failed: {exc}")
         return False
 
 
 async def fetch_and_send(server_url: str, timeout: int, client_hostname: str, force_mysql_export: bool = False) -> int:
     started = time.perf_counter()
-    print(f"Client start UTC: {dt.datetime.now(dt.timezone.utc).strftime('%Y-%m-%d %H:%M:%S UTC')}")
+    _log("INFO", f"Client start UTC: {_utc_timestamp()}")
 
     async with FR24() as fr24:
         fetch_started = time.perf_counter()
@@ -93,14 +111,13 @@ async def fetch_and_send(server_url: str, timeout: int, client_hostname: str, fo
         df = datac.df
         payload = build_payload(df, client_hostname=client_hostname, force_mysql_export=force_mysql_export)
 
-        print(f"Fetched rows: {len(df)}")
-        print(f"Fetch time: {fetch_elapsed:.2f}s")
-        print(f"Client hostname: {client_hostname}")
-        print(f"Force MySQL export: {force_mysql_export}")
-
+    _log(
+        "INFO",
+        f"fetch_rows={len(df)} fetch_time={fetch_elapsed:.2f}s client_name={client_hostname} force_export={force_mysql_export}",
+    )
     sent_ok = send_to_server(server_url, payload, timeout=timeout, force_mysql_export=force_mysql_export)
     total_elapsed = time.perf_counter() - started
-    print(f"Client total runtime: {total_elapsed:.2f}s")
+    _log("INFO", f"Client total runtime: {total_elapsed:.2f}s")
 
     return 0 if sent_ok else 1
 

@@ -27,13 +27,31 @@ from fr24_processing import export_df_to_duckdb, fr24convert
 from mysql_export_fr24 import mysql_export
 
 LOGGER = logging.getLogger("fr24_server")
-_CONFIG_PATH = Path(__file__).with_name("config.toml")
+_PROJECT_ROOT = Path(__file__).resolve().parent
+_CONFIG_PATH = _PROJECT_ROOT / "config.toml"
 DUCKDB_ACCESS_LOCK = threading.RLock()
 
 MYSQL_EXPORT_ENABLED = True
 MYSQL_TABLE = "k53371_fp.fr24"
 DUCKDB_TABLE = "fr24"
-DUCKDB_DIR = "./duckdb"
+
+
+def _resolve_duckdb_dir(configured_dir: str | None = None) -> Path:
+    try:
+        with _CONFIG_PATH.open("rb") as config_file:
+            config_data = tomllib.load(config_file)
+    except (FileNotFoundError, tomllib.TOMLDecodeError):
+        config_data = {}
+
+    server_cfg = config_data.get("server", {})
+    value = configured_dir or server_cfg.get("duckdb_dir") or "./duckdb"
+    resolved = Path(str(value)).expanduser()
+    if not resolved.is_absolute():
+        resolved = (_PROJECT_ROOT / resolved).resolve()
+    return resolved
+
+
+DUCKDB_DIR = str(_resolve_duckdb_dir())
 EXPORT_STOP_EVENT = threading.Event()
 EXPORT_THREAD: threading.Thread | None = None
 LOG_RETENTION_DAYS = 14
@@ -219,10 +237,15 @@ def _force_mysql_export_requested(request: Request, payload: dict[str, Any]) -> 
     return False
 
 
+def _is_allowed_ingest_user_agent(request: Request) -> bool:
+    user_agent = (request.headers.get("user-agent") or request.headers.get("User-Agent") or "").strip()
+    return "fr24gprc/" in user_agent.lower()
+
+
 def _duckdb_status() -> dict[str, Any]:
-    db_dir = Path(DUCKDB_DIR)
+    db_dir = _resolve_duckdb_dir(DUCKDB_DIR)
     if not db_dir.exists():
-        return {"ok": False, "error": f"DuckDB directory not found: {DUCKDB_DIR}"}
+        return {"ok": False, "error": f"DuckDB directory not found: {db_dir}"}
 
     latest_row: dict[str, Any] | None = None
     db_files = sorted(db_dir.glob("fr24_*.duckdb"))
@@ -435,6 +458,11 @@ async def ingest_handler(
     request: Request,
     force_mysql_export: bool = Query(False, description="Immediately export DuckDB rows to MySQL after ingest"),
 ) -> JSONResponse:
+    user_agent = (request.headers.get("user-agent") or request.headers.get("User-Agent") or "").strip()
+    if not _is_allowed_ingest_user_agent(request):
+        LOGGER.warning("Rejected ingest request with disallowed User-Agent: %s", user_agent or "<missing>")
+        return JSONResponse(status_code=403, content={"ok": False, "error": "Forbidden: invalid User-Agent"})
+
     try:
         payload = await _read_json_payload(request)
     except HTTPException:
@@ -520,7 +548,7 @@ def parse_args() -> argparse.Namespace:
     parser = argparse.ArgumentParser(description="Receive FR24 payloads and store/export them")
     parser.add_argument("--host", default=server_cfg.get("host", "0.0.0.0"), help="Bind host")
     parser.add_argument("--port", type=int, default=int(server_cfg.get("port", 8080)), help="Bind port")
-    parser.add_argument("--duckdb-dir", default=server_cfg.get("duckdb_dir", "./duckdb"), help="DuckDB folder path")
+    parser.add_argument("--duckdb-dir", default=str(_resolve_duckdb_dir(server_cfg.get("duckdb_dir", "./duckdb"))), help="DuckDB folder path")
     parser.add_argument("--duckdb-table", default=server_cfg.get("duckdb_table", "fr24"), help="DuckDB table name")
     parser.add_argument("--mysql-table", default=server_cfg.get("mysql_table", "k53371_fp.fr24"), help="MySQL destination table")
     parser.add_argument("--log-file", default=server_cfg.get("log_file", "./logs/fr24_server.log"), help="Server log file path")

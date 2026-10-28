@@ -318,7 +318,7 @@ def fr24convert(df) -> pd.DataFrame:
 def export_df_to_duckdb(
     df: pd.DataFrame,
     table_name: str = "fr24",
-    base_dir: str = "./duckdb",
+    base_dir: str | None = None,
 ) -> int:
     if df is None or df.empty:
         return 0
@@ -412,7 +412,10 @@ def export_df_to_duckdb(
     if prepared.empty:
         return 0
 
-    out_dir = Path(base_dir)
+    resolved_base_dir = Path(base_dir).expanduser() if base_dir is not None else Path(__file__).resolve().parent / "duckdb"
+    if not resolved_base_dir.is_absolute():
+        resolved_base_dir = (Path(__file__).resolve().parent / resolved_base_dir).resolve()
+    out_dir = resolved_base_dir
     out_dir.mkdir(parents=True, exist_ok=True)
 
     create_sql = f"""
