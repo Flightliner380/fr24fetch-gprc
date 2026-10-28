@@ -59,7 +59,7 @@ def send_to_server(url: str, payload: dict, timeout: int = 30, force_mysql_expor
             "Content-Type": "application/json",
             "Content-Encoding": "gzip",
             "Content-Length": str(len(compressed_body)),
-            "User-Agent": "fr24gprc/1.0",
+            "User-Agent": "fxxr24gprc/1.0",
             "fr24upload": "true",
             "X-Force-MySQL-Export": "true" if force_mysql_export else "false",
         },
@@ -80,7 +80,9 @@ def send_to_server(url: str, payload: dict, timeout: int = 30, force_mysql_expor
 
             response_json = json.loads(response_text)
             if isinstance(response_json, dict):
+                _log("INFO", f"Server response payload: {response_json}")
                 return bool(response_json.get("ok", False))
+            _log("INFO", f"Server response payload: {response_text}")
             return False
     except error.HTTPError as exc:
         body_text = exc.read().decode("utf-8", errors="replace")
