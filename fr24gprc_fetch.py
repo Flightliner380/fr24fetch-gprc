@@ -17,7 +17,7 @@ import flag
 from mysql_export_fr24 import mysql_export
 
 _CONFIG_PATH = Path(__file__).with_name("config.toml")
-APP_VERSION = "1.0.0"
+APP_VERSION = "0.4.0"
 
 
 def _load_client_config() -> dict:
