@@ -1,0 +1,16 @@
+services:
+  fr24-client:
+    build:
+      context: .
+      dockerfile: Dockerfile.client
+    container_name: fr24-client
+    command:
+      - python
+      - fr24_client.py
+      - --server-url
+      - ${FR24_SERVER_URL:-http://host.docker.internal:8080/ingest}
+    restart: "no"
+    environment:
+      PYTHONUNBUFFERED: "1"
+    volumes:
+      - ./config.toml:/app/config.toml:ro

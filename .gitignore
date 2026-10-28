@@ -1,6 +1,11 @@
 config.py
-venv/
+config.toml
+.venv/*
+venv/*
+data/*
 duckdb/
 fr24_parq/
 __pycache__/
+
+
 

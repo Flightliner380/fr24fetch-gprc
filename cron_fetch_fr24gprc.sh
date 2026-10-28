@@ -1,4 +1,4 @@
 #!/bin/bash
-cd /home/ubuntu/fr24fetch-gprc
+cd /home/flightliner/python/fr24fetch-gprc
 source .venv/bin/activate
-python fr24gprc_fetch.py
+python fr24_client.py

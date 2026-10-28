@@ -2,3 +2,9 @@ pandas
 duckdb
 SQLAlchemy
 pymysql
+fastapi
+uvicorn
+
+# Install your own FR24 client package from GitHub instead of the public PyPI package.
+# Replace the placeholder below with your repository URL.
+fr24 @ git+ssh://git@github.com/Flightliner380/fr24gprc.git

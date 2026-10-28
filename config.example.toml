@@ -1,0 +1,47 @@
+# Example configuration for FR24 ingest/export pipeline
+# Copy this file to config.toml and replace placeholder values.
+
+[mysql]
+host = "db.example.com"
+port = 3306
+user = "fr24_user"
+password = "replace-with-real-password"
+database = "fr24_db"
+autocommit = false
+driver = "pymysql"
+
+[client]
+server_url = "http://127.0.0.1:8080/ingest"
+timeout = 30
+hostname = "fr24-client-01"
+
+[server]
+host = "0.0.0.0"
+port = 8080
+duckdb_dir = "./duckdb"
+duckdb_table = "fr24"
+mysql_table = "fr24_db.fr24n"
+skip_mysql_export = false
+log_file = "./logs/fr24_server.log"
+log_level = "INFO"
+log_retention_days = 14
+cors_origins = ["http://localhost:3000", "http://127.0.0.1:3000"]
+
+[export]
+chunk_size = 7500
+duckdb_table = "fr24"
+interval_minutes = 3
+
+# Required for protected /export and /statusdb endpoints.
+# Set to a real secret before exposing the server.
+export_auth_token = "CHANGE_ME"
+
+# Exact-value exclusion filters for MySQL export.
+# Any row matching any configured value is skipped before insert/update.
+exclude_hex = []
+exclude_callsign = []
+exclude_cat = ["A7", "B6"]
+exclude_ac = []
+
+[near]
+max_alt_ft = 3000
