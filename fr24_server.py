@@ -27,7 +27,7 @@ from fr24_processing import export_df_to_duckdb, fr24convert
 from mysql_export_fr24 import mysql_export
 
 LOGGER = logging.getLogger("fr24_server")
-APP_VERSION = "1.0.0"
+APP_VERSION = "1.0.1"
 _PROJECT_ROOT = Path(__file__).resolve().parent
 _CONFIG_PATH = _PROJECT_ROOT / "config.toml"
 DUCKDB_ACCESS_LOCK = threading.RLock()
@@ -497,13 +497,12 @@ async def ingest_handler(
     force_requested = bool(force_mysql_export or _force_mysql_export_requested(request, payload))
 
     LOGGER.info(
-        "server_version=%s Ingest request client_hostname=%s payload_timestamp=%s rows=%d server_hostname=%s force_mysql_export=%s",
+        "server_version=%s Ingest request client=%s payload_timestamp=%s rows=%d user_agent=%s",
         APP_VERSION,
         client_hostname,
         payload_timestamp,
         rows_received,
-        server_hostname,
-        force_requested,
+        user_agent
     )
 
     try:
@@ -597,7 +596,7 @@ def main() -> None:
     DUCKDB_DIR = args.duckdb_dir
 
     LOGGER.info(
-        "FR24 server version=%s listening on http://%s:%s/ingest (mysql_export=%s)",
+        "FR24 Server version=%s listening on http://%s:%s/ingest (mysql_export=%s)",
         APP_VERSION,
         args.host,
         args.port,
