@@ -110,10 +110,13 @@ with open(RUNWAYS_SRC, encoding="utf-8") as f:
         if not code:
             continue
         surface = (row.get("surface") or "").strip().lower()
-        if code in commercial_codes and any(g in surface for g in GRASS_SURFACES):
+        if code in commercial_codes and any(g.lower() in surface for g in GRASS_SURFACES):
             continue
         for end in ("le", "he"):
             ident = row.get(f"{end}_ident")
+            if code in commercial_codes and ident and ident.upper().startswith("H"):
+                continue
+
             hdg = row.get(f"{end}_heading_degT")
             lat = row.get(f"{end}_latitude_deg")
             lon = row.get(f"{end}_longitude_deg")
