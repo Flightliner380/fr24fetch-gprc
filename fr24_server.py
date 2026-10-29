@@ -248,6 +248,7 @@ def _duckdb_status() -> dict[str, Any]:
     if not db_dir.exists():
         return {"ok": False, "error": f"DuckDB directory not found: {db_dir}"}
 
+    today_ymd = dt.date.today().strftime("%Y-%m-%d")
     latest_row: dict[str, Any] | None = None
     db_files = sorted(db_dir.glob("fr24_*.duckdb"))
 
@@ -270,7 +271,9 @@ def _duckdb_status() -> dict[str, Any]:
                     COALESCE(SUM(CASE WHEN gnd = 0 THEN 1 ELSE 0 END), 0) AS airborne_count,
                     COALESCE(SUM(CASE WHEN gnd = 1 THEN 1 ELSE 0 END), 0) AS ground_count
                 FROM {DUCKDB_TABLE}
-                """
+                WHERE ymd = ?
+                """,
+                [today_ymd],
             ).fetchone()
             if row is None:
                 conn.close()
@@ -292,11 +295,11 @@ def _duckdb_status() -> dict[str, Any]:
                       AND gnd = 0
                       AND upper({field_name}) IN ({placeholders})
                 """
-                count_row = conn.execute(sql, [str(row[3]), 0, *normalized_values]).fetchone()
+                count_row = conn.execute(sql, [today_ymd, 0, *normalized_values]).fetchone()
                 exclude_counts[field_name] = int(count_row[0]) if count_row else 0
 
             combined_filters = []
-            combined_params: list[object] = [str(row[3]), 0]
+            combined_params: list[object] = [today_ymd, 0]
             for field_name, values in excluded_values.items():
                 if not values:
                     continue
@@ -365,6 +368,7 @@ def _mysql_status() -> dict[str, Any]:
     if not mysql_cfg:
         return {"ok": False, "error": "MySQL config not found"}
 
+    today_ymd = dt.date.today().strftime("%Y-%m-%d")
     driver = mysql_cfg.get("driver", "pymysql")
     port = mysql_cfg.get("port", 3306)
     mysql_url = (
@@ -388,9 +392,13 @@ def _mysql_status() -> dict[str, Any]:
                     COALESCE(MAX(fcontact), 0) AS max_fcontact,
                     COALESCE(MAX(lcontact), 0) AS max_lcontact,
                     COALESCE(COUNT(*), 0) AS row_count,
-                    COALESCE(MAX(ymd), '') AS last_ymd
+                    COALESCE(MAX(ymd), '') AS last_ymd,
+                    COALESCE(SUM(CASE WHEN gnd = 0 THEN 1 ELSE 0 END), 0) AS airborne_count,
+                    COALESCE(SUM(CASE WHEN gnd = 1 THEN 1 ELSE 0 END), 0) AS ground_count
                 FROM {MYSQL_TABLE}
-                """
+                WHERE ymd = %s
+                """,
+                (today_ymd,),
             ).fetchone()
         return {
             "ok": True,
@@ -399,6 +407,8 @@ def _mysql_status() -> dict[str, Any]:
             "max_lcontact": int(row[1]),
             "row_count": int(row[2]),
             "last_ymd": str(row[3]),
+            "airborne_count": int(row[4]),
+            "ground_count": int(row[5]),
         }
     except Exception as exc:
         LOGGER.warning("MySQL status check failed: %s", exc)
