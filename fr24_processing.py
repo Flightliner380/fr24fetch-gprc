@@ -511,5 +511,5 @@ def export_df_to_duckdb(
         finally:
             conn.close()
 
-    print(f"DuckDB rows written: {total_written}")
+    print(f"{dt.datetime.now().strftime('%Y-%m-%d %H:%M:%S,%f')[:-3]} INFO [fr24_processing]  Duckdb rows written {total_written}")
     return total_written

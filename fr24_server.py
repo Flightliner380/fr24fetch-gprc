@@ -168,7 +168,7 @@ def configure_logging(log_file: str, log_level: str = "INFO", retention_days: in
 
     level = getattr(logging, log_level.upper(), logging.INFO)
     formatter = logging.Formatter(
-        f"%(asctime)s %(levelname)s [%(name)s] server_version={APP_VERSION} %(message)s"
+        f"%(asctime)s %(levelname)s [%(name)s] %(message)s"
     )
 
     file_handler = TimedRotatingFileHandler(
