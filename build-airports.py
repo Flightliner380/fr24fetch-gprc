@@ -81,14 +81,20 @@ with open(AIRPORTS_SRC, encoding="utf-8") as f:
             continue
 
         icao = row.get("icao_code") or ""
+        if not icao and ICAO_RE.match(row.get("gps_code", "")):
+            icao = row["gps_code"]
+
         if not icao and ICAO_RE.match(row.get("ident", "")):
             icao = row["ident"]
         iata = row.get("iata_code") or ""
+        # gpscode = row.get("gps_code") or ""
+        # print(row.get("ident"), icao, iata, gpscode, row.get("type"))
         if not icao and not iata:
             continue
 
         code = icao or iata
         ident_to_code[row["ident"]] = code
+
         key = f"{int(lat // CELL)}_{int(lon // CELL)}"
         buckets[key].append([round(lat, 4), round(lon, 4), icao, iata])
 
