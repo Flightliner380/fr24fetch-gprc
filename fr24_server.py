@@ -27,7 +27,7 @@ from fr24_processing import export_df_to_duckdb, fr24convert
 from mysql_export_fr24 import mysql_export
 
 LOGGER = logging.getLogger("fr24_server")
-APP_VERSION = "1.0.1"
+APP_VERSION = "1.02"
 _PROJECT_ROOT = Path(__file__).resolve().parent
 _CONFIG_PATH = _PROJECT_ROOT / "config.toml"
 DUCKDB_ACCESS_LOCK = threading.RLock()
@@ -167,7 +167,9 @@ def configure_logging(log_file: str, log_level: str = "INFO", retention_days: in
         raise ValueError("log_retention_days must be >= 1")
 
     level = getattr(logging, log_level.upper(), logging.INFO)
-    formatter = logging.Formatter("%(asctime)s %(levelname)s [%(name)s] %(message)s")
+    formatter = logging.Formatter(
+        f"%(asctime)s %(levelname)s [%(name)s] server_version={APP_VERSION} %(message)s"
+    )
 
     file_handler = TimedRotatingFileHandler(
         log_file,
