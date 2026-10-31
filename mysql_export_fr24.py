@@ -1,8 +1,7 @@
+import datetime as dt
 import logging
 import os
 import time
-from datetime import datetime
-import datetime as dt
 import duckdb
 import tomllib
 from pathlib import Path
@@ -130,8 +129,9 @@ def mysql_export(
     export_cfg = config_data.get("export", {})
     mysql_conf = config_data.get("mysql", {})
 
-    ym = datetime.now().strftime("%Y-%m")
-    ymd = datetime.now().strftime("%Y-%m-%d")
+    now_utc = dt.datetime.now(dt.timezone.utc)
+    ym = now_utc.strftime("%Y-%m")
+    ymd = now_utc.strftime("%Y-%m-%d")
     if chunk_size is None:
         chunk_size = int(export_cfg.get("chunk_size", 7500))
     if duckdb_table is None:

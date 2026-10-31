@@ -37,6 +37,10 @@ MYSQL_TABLE = "k53371_fp.fr24"
 DUCKDB_TABLE = "fr24"
 
 
+def _utc_today_ymd() -> str:
+    return dt.datetime.now(dt.timezone.utc).strftime("%Y-%m-%d")
+
+
 def _resolve_duckdb_dir(configured_dir: str | None = None) -> Path:
     try:
         with _CONFIG_PATH.open("rb") as config_file:
@@ -248,7 +252,7 @@ def _duckdb_status() -> dict[str, Any]:
     if not db_dir.exists():
         return {"ok": False, "error": f"DuckDB directory not found: {db_dir}"}
 
-    today_ymd = dt.date.today().strftime("%Y-%m-%d")
+    today_ymd = _utc_today_ymd()
     latest_row: dict[str, Any] | None = None
     db_files = sorted(db_dir.glob("fr24_*.duckdb"))
 
@@ -368,7 +372,7 @@ def _mysql_status() -> dict[str, Any]:
     if not mysql_cfg:
         return {"ok": False, "error": "MySQL config not found"}
 
-    today_ymd = dt.date.today().strftime("%Y-%m-%d")
+    today_ymd = _utc_today_ymd()
     driver = mysql_cfg.get("driver", "pymysql")
     port = mysql_cfg.get("port", 3306)
     mysql_url = (

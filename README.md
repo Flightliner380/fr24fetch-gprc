@@ -14,6 +14,7 @@ The project is split into three main parts:
 - `fr24_processing.py` — FR24 conversion, normalization, airport/runway lookup, and DuckDB writes
 - `mysql_export_fr24.py` — MySQL export logic, filter logic, and schema-aligned upserts
 - `fr24_sync.py` — manual trigger for an immediate MySQL export
+- `fr24gprc_fetch.py` — legacy gRPC fetch script that now also uploads to `/ingest` using `[client]` config
 - `config.toml` — central runtime configuration file
 - `nearby.py` — airport and runway lookup helpers
 - `airports.json` — airport metadata for nearby-airport detection
@@ -138,6 +139,7 @@ Several important rules are enforced by the pipeline:
 - MySQL export only writes airborne rows (`gnd = 0`) for the selected time window.
 - DuckDB stores normalized rows in monthly `.duckdb` files.
 - DuckDB upserts are keyed by `(ymd, frid, hex, cs, gnd)`.
+- `ymd` is always derived and queried using UTC dates/timestamps.
 - `/statusdb` reports airborne and ground counts separately.
 
 ## Running the server
@@ -209,6 +211,12 @@ Optional force-export trigger:
 
 ```bash
 python fr24_client.py --force-mysql-export
+```
+
+Legacy fetch flow (keeps local DuckDB/MySQL behavior and also sends rows to the server):
+
+```bash
+python fr24gprc_fetch.py
 ```
 
 Manual HTTP ingest example:
